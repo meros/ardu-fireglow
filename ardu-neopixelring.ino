@@ -53,22 +53,74 @@ public:
   boolean done(int nowMillis) {
     return nowMillis > startMillis + durationMillis;
   }
+  
+  int getEndMillis() {
+    return startMillis + durationMillis;
+  }
 };
 
-Fade* currentFade = NULL;
+struct Fade *redToGreen(int fromMillis) {
+  return new Fade(fromMillis, 1000, Color(0,0,255), Color(255,0,0));
+}
+
+struct Fade *greenToRed(int fromMillis) {
+  return new Fade(fromMillis, 500, Color(255,0,0), Color(0,0,255));
+}
+
+typedef Fade* (*FadeFactory)(int fromMillis);
+
+class Loop {
+private:
+  FadeFactory *factories;
+  int numFactories;
+  
+  int state;
+  
+  Fade* current;
+  
+public:
+  Loop(FadeFactory factories[], int numFactories) : 
+    factories(factories),
+    numFactories(numFactories),
+    state(0),
+    current(NULL) {
+  }
+  
+  ~Loop() {
+    delete[] factories;
+  }
+  
+  void render(int nowMillis, Adafruit_NeoPixel& pixels) {    
+    int newStartMillis = nowMillis;
+    if (current && current->done(nowMillis)) {
+      newStartMillis = current->getEndMillis();
+    }
+    
+    if (!current || current->done(nowMillis)) {
+      delete(current);
+      state = (state + 1) % numFactories;
+      current = factories[state](newStartMillis);
+    }
+    
+    current->render(nowMillis, pixels);
+  }
+};
+
+Loop *looper;
 
 void setup() {
   pixels.begin(); 
+  
+  FadeFactory *factories = new FadeFactory[2];
+  factories[0] = redToGreen;
+  factories[1] = greenToRed;
+  
+  looper = new Loop(factories, 2);
 }
 
 void loop() {
   int now = millis();
-  
-  if (currentFade == NULL || currentFade->done(now)) {
-    delete(currentFade);
-    currentFade = new Fade(millis(), 1000, Color(0,0,255), Color(255,0,0));
-  }
-  
-  currentFade->render(now, pixels);
+
+  looper->render(now, pixels);
   pixels.show();
 }
