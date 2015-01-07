@@ -1,7 +1,11 @@
 #include <Adafruit_NeoPixel.h>
 
+#include <avr/power.h>
+
 #define PIN            0
 #define NUMPIXELS      24
+
+#define TURN (PI*2)
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
@@ -13,114 +17,103 @@ private:
   uint8_t g;
   uint8_t b;
 public:
-  Color(uint8_t r, uint8_t g, uint8_t b) :r(r), g(g), b(b) {}
-  
+  Color(uint8_t r, uint8_t g, uint8_t b) :
+  r(r), g(g), b(b) {
+  }
+
   static Color mix(Color& a, Color& b, uint8_t scale) {
     return Color(
-      map(scale, 0, 255, a.r, b.r),
-      map(scale, 0, 255, a.g, b.g),
-      map(scale, 0, 255, a.b, b.b));
+    map(scale, 0, 255, a.r, b.r),
+    map(scale, 0, 255, a.g, b.g),
+    map(scale, 0, 255, a.b, b.b));
   }
-  
+
   uint32_t getColor() {
     return Adafruit_NeoPixel::Color(r, g, b);
   }
 };
 
-class Fade {
+class Animation {
 private:
-  int startMillis;
-  int durationMillis;
-  
-  Color from;
-  Color to;
-  
+  uint32_t start;
+  uint32_t end;
+
 public:
-  Fade(int startMillis, int durationMillis, Color from, Color to) :
-  startMillis(startMillis),
-  durationMillis(durationMillis),
-  from(from),
-  to(to) {}
-  
-  void render(int nowMillis, Adafruit_NeoPixel& pixels) {    
-    uint32_t color = Color::mix(from, to, map(nowMillis, startMillis, startMillis+durationMillis, 0, 255)).getColor();
-    
+  Animation() :
+  start(0),
+  end(0) {
+  }
+
+  void extend(uint32_t now, uint32_t duration) {
+    uint32_t from = now;
+
+    if (start > 0 && end < now) {
+      // We are past the end of this an
+      from = end;
+    }
+
+    start = from;
+    end = start + duration;
+  }
+
+  void renderFade(uint32_t now, Adafruit_NeoPixel& pixels, Color from, Color to) {    
+    uint32_t color = Color::mix(from, to, map(now, start, end, 0, 255)).getColor();
+      
+
     for (int i = 0; i < pixels.numPixels(); i++) {
       pixels.setPixelColor(i, color);
     }
   }
-  
-  boolean done(int nowMillis) {
-    return nowMillis > startMillis + durationMillis;
+
+  void renderIdle(int now, Adafruit_NeoPixel& pixels) {
+    Color high = Color(0,20,50);
+    Color low = Color(20,0,20);
+      
+    for (int i = 0; i < pixels.numPixels(); i++) {
+      float s = sin(((float)(i+now)/(float)pixels.numPixels())*TURN*5)*1000;
+      
+      uint32_t color = Color::mix(high, low, map(s, -1000, 1000, 0, 255)).getColor();
+      
+      pixels.setPixelColor(i, color);
+    }
   }
-  
-  int getEndMillis() {
-    return startMillis + durationMillis;
-  }
+
+  boolean done(uint32_t now) {
+    return now > end;
+  }  
 };
 
-struct Fade *redToGreen(int fromMillis) {
-  return new Fade(fromMillis, 1000, Color(0,0,255), Color(255,0,0));
-}
-
-struct Fade *greenToRed(int fromMillis) {
-  return new Fade(fromMillis, 500, Color(255,0,0), Color(0,0,255));
-}
-
-typedef Fade* (*FadeFactory)(int fromMillis);
-
-class Loop {
-private:
-  FadeFactory *factories;
-  int numFactories;
-  
-  int state;
-  
-  Fade* current;
-  
-public:
-  Loop(FadeFactory factories[], int numFactories) : 
-    factories(factories),
-    numFactories(numFactories),
-    state(0),
-    current(NULL) {
-  }
-  
-  ~Loop() {
-    delete[] factories;
-  }
-  
-  void render(int nowMillis, Adafruit_NeoPixel& pixels) {    
-    int newStartMillis = nowMillis;
-    if (current && current->done(nowMillis)) {
-      newStartMillis = current->getEndMillis();
-    }
-    
-    if (!current || current->done(nowMillis)) {
-      delete(current);
-      state = (state + 1) % numFactories;
-      current = factories[state](newStartMillis);
-    }
-    
-    current->render(nowMillis, pixels);
-  }
-};
-
-Loop *looper;
+Animation animation;
 
 void setup() {
+  if (F_CPU == 16000000) clock_prescale_set(clock_div_1);
+
   pixels.begin(); 
-  
-  FadeFactory *factories = new FadeFactory[2];
-  factories[0] = redToGreen;
-  factories[1] = greenToRed;
-  
-  looper = new Loop(factories, 2);
 }
 
-void loop() {
-  int now = millis();
+int now = 0;
 
-  looper->render(now, pixels);
-  pixels.show();
+void loop() { 
+  if (now % 2 > 0) {
+  digitalWrite(1, HIGH);
+  } else {
+    digitalWrite(1, LOW);
+  }
+  
+  bool idle = true;
+
+  if (idle) {
+    if (animation.done(now)) {
+      animation.extend(now, 100);    
+    }
+
+    animation.renderIdle(now, pixels);
+    pixels.show();
+  }
+  
+  delay(100);
+  
+  now++;
 }
+
+
