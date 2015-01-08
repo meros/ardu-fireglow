@@ -6,114 +6,104 @@
 #define NUMPIXELS      24
 
 #define TURN (PI*2)
+#define DELAYVAL (500)
+
+#define BUTTON_PIN 4
+
+uint8_t threeturns[] = {
+  128,
+  218,
+  255,
+  218,
+  128,
+  37,
+  0,
+  37,
+  128,
+  218,
+  255,
+  218,
+  128,
+  37,
+  0,
+  37,
+  128,
+  218,
+  255,
+  218,
+  128,
+  37,
+  0,
+  37};
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
-int delayval = 500;
+int now = 0;
 
-class Color {
-private:
-  uint8_t r;
-  uint8_t g;
-  uint8_t b;
-public:
-  Color(uint8_t r, uint8_t g, uint8_t b) :
-  r(r), g(g), b(b) {
+int state = 0;
+
+void renderIdle(int now, Adafruit_NeoPixel& pixels) {
+  for (int i = 0; i < NUMPIXELS; i++) {
+    pixels.setPixelColor(i, 0, 0, threeturns[(i+now)%NUMPIXELS]/3+10);
   }
+} 
 
-  static Color mix(Color& a, Color& b, uint8_t scale) {
-    return Color(
-    map(scale, 0, 255, a.r, b.r),
-    map(scale, 0, 255, a.g, b.g),
-    map(scale, 0, 255, a.b, b.b));
+void renderTest(int now, Adafruit_NeoPixel& pixels) {
+  for (int i = 0; i < pixels.numPixels(); i++) {
+    pixels.setPixelColor(i, 255,0,0);
   }
-
-  uint32_t getColor() {
-    return Adafruit_NeoPixel::Color(r, g, b);
-  }
-};
-
-class Animation {
-private:
-  uint32_t start;
-  uint32_t end;
-
-public:
-  Animation() :
-  start(0),
-  end(0) {
-  }
-
-  void extend(uint32_t now, uint32_t duration) {
-    uint32_t from = now;
-
-    if (start > 0 && end < now) {
-      // We are past the end of this an
-      from = end;
-    }
-
-    start = from;
-    end = start + duration;
-  }
-
-  void renderFade(uint32_t now, Adafruit_NeoPixel& pixels, Color from, Color to) {    
-    uint32_t color = Color::mix(from, to, map(now, start, end, 0, 255)).getColor();
-      
-
-    for (int i = 0; i < pixels.numPixels(); i++) {
-      pixels.setPixelColor(i, color);
-    }
-  }
-
-  void renderIdle(int now, Adafruit_NeoPixel& pixels) {
-    Color high = Color(0,20,50);
-    Color low = Color(20,0,20);
-      
-    for (int i = 0; i < pixels.numPixels(); i++) {
-      float s = sin(((float)(i+now)/(float)pixels.numPixels())*TURN*5)*1000;
-      
-      uint32_t color = Color::mix(high, low, map(s, -1000, 1000, 0, 255)).getColor();
-      
-      pixels.setPixelColor(i, color);
-    }
-  }
-
-  boolean done(uint32_t now) {
-    return now > end;
-  }  
-};
-
-Animation animation;
+}
 
 void setup() {
   if (F_CPU == 16000000) clock_prescale_set(clock_div_1);
-
+  pinMode(BUTTON_PIN, INPUT);
   pixels.begin(); 
 }
 
-int now = 0;
-
 void loop() { 
   if (now % 2 > 0) {
-  digitalWrite(1, HIGH);
-  } else {
+    digitalWrite(1, HIGH);
+  } 
+  else {
     digitalWrite(1, LOW);
   }
-  
+
   bool idle = true;
 
-  if (idle) {
-    if (animation.done(now)) {
-      animation.extend(now, 100);    
-    }
-
-    animation.renderIdle(now, pixels);
-    pixels.show();
+  int buttonState =  digitalRead(BUTTON_PIN);
+  if (state == 0 && buttonState) {
+    state = 1;
+    now = 0;
+  }   
+  
+  if (state > 0 && !buttonState) {
+    state = 0;
+    now = 0;
   }
-  
-  delay(100);
-  
+
+  switch(state) {
+  case 0:  
+    renderIdle(now, pixels);
+    break;
+  case 1:
+    renderTest(now, pixels);
+    break;
+  }
+
+  pixels.show();
+
+  delay(DELAYVAL);
   now++;
 }
+
+
+
+
+
+
+
+
+
+
 
 
