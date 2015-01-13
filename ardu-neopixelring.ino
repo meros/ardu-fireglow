@@ -48,7 +48,7 @@ int state = 0;
 
 void renderIdle(int now, Adafruit_NeoPixel& pixels) {
   for (int i = 0; i < NUMPIXELS; i++) {
-    pixels.setPixelColor(i, 0, 0, map(sinval(map(i, 0, 24, 0, 24*5)+now), 0, 255, 20, 40));
+    pixels.setPixelColor(i, 0, 0, sinval(map(i, 0, 24, 0, 24*3)+now));
   }
 } 
 
@@ -153,6 +153,7 @@ void renderChecker(int now, Adafruit_NeoPixel& pixels) {
   }
 }
 
+int oldButtonState = 0;
 
 void setup() {
   if (F_CPU == 16000000) clock_prescale_set(clock_div_1);
@@ -171,15 +172,12 @@ void loop() {
   bool idle = true;
 
   int buttonState =  digitalRead(BUTTON_PIN);
-  if (state == 0 && buttonState) {
-    state = random(1,4);
+  if (!oldButtonState && buttonState) {
+    state = random(0,4);
     now = 0;
   }   
 
-  if (state > 0 && !buttonState) {
-    state = 0;
-    now = 0;
-  }
+  oldButtonState = buttonState;
 
   switch(state) {
   case 0:  
