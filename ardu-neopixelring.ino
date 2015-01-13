@@ -42,17 +42,17 @@ uint8_t sinval(uint8_t i) {
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
-int now = 0;
+uint32_t now = 0;
 
 int state = 0;
 
-void renderIdle(int now, Adafruit_NeoPixel& pixels) {
+void renderIdle(uint32_t now, Adafruit_NeoPixel& pixels) {
   for (int i = 0; i < NUMPIXELS; i++) {
     pixels.setPixelColor(i, 0, 0, sinval(map(i, 0, 24, 0, 24*3)+now));
   }
 } 
 
-void renderRainbow(int now, Adafruit_NeoPixel& pixels) {
+void renderRainbow(uint32_t now, Adafruit_NeoPixel& pixels) {
   uint8_t color = (now*5)/256 % 3;
   uint8_t f = (now*5) % 256;
   uint8_t fi = 255 - f;
@@ -72,7 +72,7 @@ void renderRainbow(int now, Adafruit_NeoPixel& pixels) {
   }
 }
 
-void renderWhite(int now, Adafruit_NeoPixel& pixels) {
+void renderWhite(uint32_t now, Adafruit_NeoPixel& pixels) {
   uint8_t part = (now*5)/256 % 5;
   uint8_t f = (now*5) % 256;
   uint8_t fi = 255 - f;
@@ -141,7 +141,7 @@ void renderWhite(int now, Adafruit_NeoPixel& pixels) {
   }
 }
 
-void renderChecker(int now, Adafruit_NeoPixel& pixels) {
+void renderChecker(uint32_t now, Adafruit_NeoPixel& pixels) {
   for (int i = 0; i < NUMPIXELS; i++) {
     if ((i+(now/50)) % 2 ) {
       pixels.setPixelColor(i, 255, 0, 0);
