@@ -1,3 +1,3 @@
-# ardu-neopixelring
-Using the attiny85 based trinket, this is a small project to build a portable light show for the lego set we have at work. Silly? Yes...
+# ardu-fireglow
+Using the attiny85 based trinket, this is a small project to build a fire simulation for the gingerbread house this year
 
