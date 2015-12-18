@@ -1,5 +1,6 @@
 #include <Adafruit_NeoPixel.h>
 
+#include <FastLED.h>
 #include <avr/power.h>
 
 #define PIN            0
@@ -9,6 +10,12 @@
 #define DELAYVAL (10)
 
 #define BUTTON_PIN 4
+
+typedef struct SRGB {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+} SRGB;
 
 const uint8_t sinval_data[] = {
   128,
@@ -46,112 +53,43 @@ uint32_t now = 0;
 
 int state = 0;
 
-void renderIdle(uint32_t now, Adafruit_NeoPixel& pixels) {
+
+
+void setRgb(Adafruit_NeoPixel& pixels, int i, SRGB& rgb) {
+    pixels.setPixelColor(i, rgb.r, rgb.g, rgb.b);
+}
+
+
+void blendRGB(SRGB& destRGB, int i, int from, int to, SRGB& fromRGB, SRGB& toRGB) {
+  destRGB.r = map(i, from, to, fromRGB.r, toRGB.r);
+  destRGB.g = map(i, from, to, fromRGB.g, toRGB.g);
+  destRGB.b = map(i, from, to, fromRGB.b, toRGB.b);
+}
+
+
+void renderFire(uint32_t now, Adafruit_NeoPixel& pixels) {
+  SRGB red;
+  red.r = 70;
+  red.g = 30;
+  red.b = 0;
+
+  SRGB yellow;
+  yellow.r = 30;
+  yellow.g = 10;
+  yellow.b = 0;
+
+  SRGB black;
+  black.r = 0;
+  black.g = 0;
+  black.b = 0;
+
+  SRGB dest;
   for (int i = 0; i < NUMPIXELS; i++) {
-    pixels.setPixelColor(i, 0, 0, sinval(map(i, 0, 24, 0, 24*3)+now));
+      blendRGB(dest, constrain(inoise8((now)*10, i*100), 50, 200), 50, 200, red, yellow);
+      blendRGB(dest, constrain(inoise8(now*50), 100, 170), 100, 255, dest, black);
+    setRgb(pixels, i, dest);
   }
 } 
-
-void renderRainbow(uint32_t now, Adafruit_NeoPixel& pixels) {
-  uint8_t color = (now*5)/256 % 3;
-  uint8_t f = (now*5) % 256;
-  uint8_t fi = 255 - f;
-
-  for (int i = 0; i < NUMPIXELS; i++) {
-    switch(color) {
-    case 0:
-      pixels.setPixelColor(i, fi, f, 0);
-      break;
-    case 1:
-      pixels.setPixelColor(i, 0, fi, f);
-      break;
-    case 2:
-      pixels.setPixelColor(i, f, 0, fi);
-      break;    
-    }
-  }
-}
-
-void renderWhite(uint32_t now, Adafruit_NeoPixel& pixels) {
-  uint8_t part = (now*5)/256 % 5;
-  uint8_t f = (now*5) % 256;
-  uint8_t fi = 255 - f;
-
-  for (int i = 0; i < NUMPIXELS; i++) {
-    switch(part) {
-    case 0: 
-      {
-        uint8_t brightness = map(sinval(i), 0, 255, 0, f);
-        pixels.setPixelColor(i, brightness, brightness, brightness);
-        break;
-      }
-    case 1: 
-      {
-        uint8_t brightness = sinval(i);
-
-        if (brightness > 256/2) {
-          brightness = min(255, brightness + f);
-        }
-
-        if (brightness < 256/2) {
-          brightness = max(0, brightness - f);
-        }
-
-        pixels.setPixelColor(i, brightness, brightness, brightness);
-        break;
-      }
-    case 2: 
-      {
-        uint8_t brightness = sinval(i + map(f, 0, 255, 0, 12));
-
-        if (brightness > 256/2) {
-          brightness = 255;
-        }
-
-        if (brightness < 256/2) {
-          brightness = 0;
-        }
-
-
-        pixels.setPixelColor(i, brightness, brightness, brightness);
-        break;    
-      }
-    case 3:
-      {
-        uint8_t brightness = sinval(i+12);
-
-        if (brightness > 256/2) {
-          brightness = min(255, brightness + fi);
-        }
-
-        if (brightness < 256/2) {
-          brightness = max(0, brightness - fi);
-        }
-
-        pixels.setPixelColor(i, brightness, brightness, brightness);
-        break;
-      }   
-    case 4: 
-      {
-        uint8_t brightness = map(sinval(i+12), 0, 255, 0, fi);
-        pixels.setPixelColor(i, brightness, brightness, brightness);
-        break;
-      }
-    }
-  }
-}
-
-void renderChecker(uint32_t now, Adafruit_NeoPixel& pixels) {
-  for (int i = 0; i < NUMPIXELS; i++) {
-    if ((i+(now/50)) % 2 ) {
-      pixels.setPixelColor(i, 255, 0, 0);
-
-    } 
-    else {
-      pixels.setPixelColor(i, 0, 255, 0);
-    }
-  }
-}
 
 int oldButtonState = 0;
 
@@ -162,18 +100,11 @@ void setup() {
 }
 
 void loop() { 
-  if (now % 2 > 0) {
-    digitalWrite(1, HIGH);
-  } 
-  else {
-    digitalWrite(1, LOW);
-  }
-
   bool idle = true;
 
   int buttonState =  digitalRead(BUTTON_PIN);
   if (!oldButtonState && buttonState) {
-    state = random(0,4);
+    state = random(0,0);
     now = 0;
   }   
 
@@ -181,18 +112,8 @@ void loop() {
 
   switch(state) {
   case 0:  
-    renderIdle(now, pixels);
+    renderFire(now, pixels);
     break;
-  case 1:
-    renderWhite(now, pixels);
-    break;
-  case 2:
-    renderRainbow(now, pixels);
-    break;
-  case 3:
-    renderChecker(now, pixels);
-    break;
-
   }
 
   pixels.show();
